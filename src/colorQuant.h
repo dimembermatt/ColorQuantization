@@ -2,12 +2,16 @@
  *	colorQuant.h
  *  for color quantization of images,
  *      using 'buckets' (bounding boxes) and median cut.
- *	Last Modified: 1/16/19
+ *  Note: median cut currently provides worse results compared to dim/2,
+ *      WIP and unused
+ *	Last Modified: 1/19/19
  *	Author: Matthew Yu
  **/
 #ifndef _COLORQUANT_H
 #define _COLORQUANT_H
-#define CAPACITY 10
+#include <vector>
+using std::vector;
+
 
 class Point{
     public:
@@ -18,7 +22,6 @@ class Point{
         int& operator[](const int idx);
         void printPoint();
 };
-
 
 class BoundBox{
     private:
@@ -63,14 +66,11 @@ class BoundBox{
         void printBoundBox();
 };
 
-/* Implementing Median Cut for color quantization*/
 class Bucket{
 	private:
-        const static int NODE_CAPACITY = CAPACITY;
-
+        int BUCKET_CAPACITY;
         BoundBox boundingArea;
-        Point pts[NODE_CAPACITY];
-        int idx;
+        vector<Point> pts;
 
         /**
          *  @funct: checks if point is in the bucket
@@ -79,8 +79,26 @@ class Bucket{
          **/
         int getIdx(Point pt);
 
+        /**
+         *  @funct: finds the kth largest number in a set of numbers
+         *  @param: vector<int>& nums, set of numbers
+         *      in this context, a set of indexes -accessing the idx val
+         *  @param: int k - look for the kth largest value
+         *  @param: int cIdx - compare the color at cIdx of each point
+         *  @return: int - zero idx of kth largest number in the set
+         *  @note: UNUSED - QUALITY LOSS COMPARED TO DIM/2
+         **/
+        int findKthLargest(vector<int>& nums, int k, int cIdx);
+
+        /**
+         *  @funct: finds the median of the points in the bucket
+         *  @param: int cIdx - part of the Point (r|g|b)
+         *  @return: int - zero idx of pt in pts, -1 elsewise
+         *  @note: UNUSED - QUALITY LOSS COMPARED TO DIM/2
+         **/
+        int findMedian(int cIdx);
 	public:
-		Bucket(BoundBox b);
+		Bucket(BoundBox b, int c);
 
         /**
          *  @funct: insert a color into the bucket
@@ -103,6 +121,18 @@ class Bucket{
          *  @note: for determining whether to split the bucket
          **/
         int getNumPts();
+
+        /**
+         *  @funct: returns max allowed colors in bucket
+         *  @return: int - max number of colors in bucket
+         **/
+        int getCapacity();
+
+        /**
+         *  @funct: sets max number of colors in bucket
+         *  @return: int - max number of colors in bucket
+         **/
+        void setCapacity(int capacity);
 
         /**
          *  @funct: returns bounding box of bucket
@@ -152,8 +182,6 @@ class Bucket{
          *  @return: Point - color of bucket
          **/
         Point getColor();
-
-
 };
 
 

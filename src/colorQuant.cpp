@@ -1,8 +1,8 @@
 /**
- *	colorQuant.c
+ *	colorQuant.cpp
  *  for color quantization of images,
  *      using 'buckets' (bounding boxes) and median cut.
- *	Last Modified: 1/16/19
+ *	Last Modified: 1/18/19
  *	Author: Matthew Yu
  **/
 #include "colorQuant.h"
@@ -62,23 +62,87 @@ void BoundBox::printBoundBox(){
         dims.x << "," << dims.y << "," << dims.z << endl;
 }
 /*----------------------------------------------------------------------------*/
+//private
 int Bucket::getIdx(Point pt){
-    for(int i = 0; i < idx; i++){
+    for(unsigned int i = 0; i < pts.size(); i++){
         if(pts[i] == pt)
             return i;
     }
     return -1;
 }
 
-Bucket::Bucket(BoundBox b){
+/*Reginald Frank, A&M Jan 2019*/
+int Bucket::findKthLargest(vector<int>& nums, int k, int cIdx) {
+    k=nums.size()-k;
+    int R,L,r,l;
+    L = 0;
+    R = nums.size()-1;
+    while(L < R){
+        l = L;
+        r = R + 1;
+        int piv = rand()%(R - L + 1) + L;
+        int temp = nums[L];
+        nums[L] = nums[piv];
+        nums[piv] = temp;
+        //randomizes the pivot choice
+
+        //loop inv: nums[L..l] only has elements equal or smaller than nums[L]
+        //and nums[r..R] only has elements greater than nums[L]
+        int i = l + 1;
+        while(i < r){
+            //while i hasn't intersected the right array
+            int swp = i;
+            if(pts[nums[i]][cIdx] < pts[nums[L]][cIdx])
+                swp = ++l;
+            else if(pts[nums[i]][cIdx] > pts[nums[L]][cIdx])
+                swp = --r;
+            if(swp != i){
+                temp = nums[swp];
+                nums[swp] = nums[i];
+                nums[i] = temp;
+            }
+            else
+                i++;
+        }
+        if(k <= l)
+            R = l;
+        else if(k < r){
+            R = r - 1;
+            L = l + 1;
+        }else
+            L = r;
+    }
+    return nums[L];
+}
+
+int Bucket::findMedian(int cIdx){
+    int kthLargest = pts.size()/2;
+    if(pts.size()%2 == 1)   //odd
+        kthLargest++;
+
+    //build array
+    vector<int> idxArr;
+    for(int i = 0; i < pts.size(); i++){
+        idxArr.push_back(i);
+    }
+
+    // cout << "bucketContents(" << idxArr.size() << ")" << endl;
+    return findKthLargest(idxArr, kthLargest, cIdx);
+}
+
+//public
+Bucket::Bucket(BoundBox b, int c){
     boundingArea = b;
-    idx = 0;
+    BUCKET_CAPACITY = c;
 }
 
 bool Bucket::insert(Point pt){
-    if(boundingArea.contains(pt) && idx < NODE_CAPACITY){
-        pts[idx] = pt;
-        idx++;
+    if((unsigned int) boundingArea.contains(pt) && pts.size() < BUCKET_CAPACITY){
+        for(unsigned int i = 0; i < pts.size(); i++){ //don't add duplicates
+            if(pt == pts[i])
+                return true;
+        }
+        pts.push_back(pt);
         return true;
     }
     return false;
@@ -88,17 +152,22 @@ bool Bucket::remove(Point pt){
     int j = getIdx(pt);
     if(j != -1){
         //shift all points down (n op)
-        for(int i = j; i < idx-1; i++){
-            pts[i] = pts[i+1];
-        }
-        idx--;
+        pts.erase(pts.begin() + j);
         return true;
     }
     return false;
 }
 
 int Bucket::getNumPts(){
-    return idx;
+    return pts.size();
+}
+
+int Bucket::getCapacity(){
+    return BUCKET_CAPACITY;
+}
+
+void Bucket::setCapacity(int capacity){
+    BUCKET_CAPACITY = capacity;
 }
 
 BoundBox Bucket::getBoundingArea(){
@@ -110,19 +179,21 @@ void Bucket::setBoundingArea(BoundBox b){
 }
 
 Point Bucket::getPoint(int idx){
-    if(idx >= 0 && idx < NODE_CAPACITY)
+    if(idx >= 0 && idx < BUCKET_CAPACITY)
         return pts[idx];
     return pts[0];
 }
 
 bool Bucket::split(Bucket &otherBucket){
     //don't run if other bucket has stuff (to be safe)
-    if(otherBucket.getNumPts()== 0){
+    if(otherBucket.getNumPts() == 0){
+        BoundBox save = boundingArea;
+
         int i;
         // find the longest axis of Cube;
         for(i = 0; i < 3; i++){
-            if(boundingArea.getDims()[i%3] > boundingArea.getDims()[(i+1)%3] &&
-                boundingArea.getDims()[i%3] > boundingArea.getDims()[(i+2)%3]){
+            if(boundingArea.getDims()[i%3] >= boundingArea.getDims()[(i+1)%3] &&
+                boundingArea.getDims()[i%3] >= boundingArea.getDims()[(i+2)%3]){
                 //largest dim is found
                 break;
             }
@@ -135,6 +206,9 @@ bool Bucket::split(Bucket &otherBucket){
         for(int j = 0; j < 3; j++){
             if(j == i){
                 //if along the cut axis, shift pos/cut dim
+                //-medCut deprecated
+                // int medIdx = findMedian(j);
+                // dim[j] = pts[medIdx][j] -  boundingArea.getPos()[j];
                 dim[j] = boundingArea.getDims()[j]/2;
                 pos[j] = boundingArea.getPos()[j] + dim[j];
             }else{
@@ -142,6 +216,10 @@ bool Bucket::split(Bucket &otherBucket){
                 dim[j] = boundingArea.getDims()[j];
             }
         }
+        //-medCut deprecated
+        // Point otherDim = boundingArea.getDims(), selfDim = dim;
+        // otherDim[i] -= selfDim[i];
+        // BoundBox b = BoundBox(pos, OtherDim);
 
         BoundBox b = BoundBox(pos, dim);
         otherBucket.setBoundingArea(b);
@@ -150,15 +228,27 @@ bool Bucket::split(Bucket &otherBucket){
         // move points into other bucket
         for(i = 0; i < getNumPts(); i++){
             Point pt = pts[i];
-
             if(!boundingArea.contains(pt)){
                 bool res = true;
                 res = remove(pt);
-                if(!res)
+                if(!res){
                     cout << "bad delete" << endl;
+                    while(1){
+                        int b = 0;
+                    }
+                }
                 res = otherBucket.insert(pt);
-                if(!res)
-                    cout << "bad insert" << endl;
+                if(!res){
+                    cout << "bad insert (splitting)" << endl;
+                    // save.printBoundBox();
+                    // boundingArea.printBoundBox();
+                    // otherBucket.getBoundingArea().printBoundBox();
+                    pt.printPoint();
+                    while(1){
+                        int b = 0;
+                    }
+                }
+                i--;
             }
         }
         return true;
@@ -167,7 +257,7 @@ bool Bucket::split(Bucket &otherBucket){
 }
 
 bool Bucket::merge(Bucket &otherBucket){
-    if(getNumPts() + otherBucket.getNumPts() < NODE_CAPACITY){
+    if(getNumPts() + otherBucket.getNumPts() < BUCKET_CAPACITY){
         //check if they intersect
         BoundBox other = otherBucket.getBoundingArea();
         if(boundingArea.intersects(other)){
