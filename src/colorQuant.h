@@ -2,9 +2,9 @@
  *	colorQuant.h
  *  for color quantization of images,
  *      using 'buckets' (bounding boxes) and median cut.
- *  Note: median cut currently provides worse results compared to dim/2,
- *      WIP and unused
- *	Last Modified: 1/19/19
+ *	Last Modified: 1/20/19
+ *      1/20 - updated find kth largest, added swap, integrated median cut with
+ *          consistently improved results
  *	Author: Matthew Yu
  **/
 #ifndef _COLORQUANT_H
@@ -80,13 +80,21 @@ class Bucket{
         int getIdx(Point pt);
 
         /**
+         *  @funct: swaps the values at the indices of the vector.
+         *  @param: vector<int>& nums, set of numbers
+         *      in this context, a set of indexes -accessing the idx val
+         *  @param: int l - left index
+         *  @param: int r - right index
+         **/
+        void swap(vector<int>& nums, int l, int r);
+
+        /**
          *  @funct: finds the kth largest number in a set of numbers
          *  @param: vector<int>& nums, set of numbers
          *      in this context, a set of indexes -accessing the idx val
          *  @param: int k - look for the kth largest value
          *  @param: int cIdx - compare the color at cIdx of each point
          *  @return: int - zero idx of kth largest number in the set
-         *  @note: UNUSED - QUALITY LOSS COMPARED TO DIM/2
          **/
         int findKthLargest(vector<int>& nums, int k, int cIdx);
 
@@ -94,7 +102,6 @@ class Bucket{
          *  @funct: finds the median of the points in the bucket
          *  @param: int cIdx - part of the Point (r|g|b)
          *  @return: int - zero idx of pt in pts, -1 elsewise
-         *  @note: UNUSED - QUALITY LOSS COMPARED TO DIM/2
          **/
         int findMedian(int cIdx);
 	public:

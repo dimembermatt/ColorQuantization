@@ -2,7 +2,9 @@
  *	colorQuant.cpp
  *  for color quantization of images,
  *      using 'buckets' (bounding boxes) and median cut.
- *	Last Modified: 1/18/19
+ *	Last Modified: 1/20/19
+ *      1/20 - updated find kth largest, added swap, integrated median cut with
+ *          consistently improved results
  *	Author: Matthew Yu
  **/
 #include "colorQuant.h"
@@ -71,46 +73,41 @@ int Bucket::getIdx(Point pt){
     return -1;
 }
 
+void Bucket::swap(vector<int>& nums, int l, int r){
+    int temp = nums[l];
+    nums[l] = nums[r];
+    nums[r] = temp;
+}
+
 /*Reginald Frank, A&M Jan 2019*/
 int Bucket::findKthLargest(vector<int>& nums, int k, int cIdx) {
-    k=nums.size()-k;
-    int R,L,r,l;
+    k = nums.size()-k; //where the element would appear in a sorted array
+    int L,R,l,r;
     L = 0;
     R = nums.size()-1;
     while(L < R){
+        int p = rand()%(R-L+1)+L;
+        swap(nums, p, L);
         l = L;
-        r = R + 1;
-        int piv = rand()%(R - L + 1) + L;
-        int temp = nums[L];
-        nums[L] = nums[piv];
-        nums[piv] = temp;
-        //randomizes the pivot choice
-
-        //loop inv: nums[L..l] only has elements equal or smaller than nums[L]
-        //and nums[r..R] only has elements greater than nums[L]
-        int i = l + 1;
-        while(i < r){
-            //while i hasn't intersected the right array
-            int swp = i;
-            if(pts[nums[i]][cIdx] < pts[nums[L]][cIdx])
-                swp = ++l;
-            else if(pts[nums[i]][cIdx] > pts[nums[L]][cIdx])
-                swp = --r;
-            if(swp != i){
-                temp = nums[swp];
-                nums[swp] = nums[i];
-                nums[i] = temp;
-            }
-            else
-                i++;
+        r = R;
+        while(l<r){
+            while(pts[nums[r]][cIdx] > pts[nums[L]][cIdx])
+                r--;
+            if(l == r)
+                break;
+            while(pts[nums[l]][cIdx] <= pts[nums[L]][cIdx] && l < R)
+                l++;
+            if(l < r)
+                swap(nums, l, r--);
+            else if(r != R)
+                l--;
         }
-        if(k <= l)
-            R = l;
-        else if(k < r){
-            R = r - 1;
-            L = l + 1;
-        }else
-            L = r;
+        swap(nums, l, L);
+        if(k == l)
+            return nums[l];
+        if(k < l)
+            R = l-1;
+        else L = l+1;
     }
     return nums[L];
 }
@@ -126,7 +123,6 @@ int Bucket::findMedian(int cIdx){
         idxArr.push_back(i);
     }
 
-    // cout << "bucketContents(" << idxArr.size() << ")" << endl;
     return findKthLargest(idxArr, kthLargest, cIdx);
 }
 
@@ -206,22 +202,17 @@ bool Bucket::split(Bucket &otherBucket){
         for(int j = 0; j < 3; j++){
             if(j == i){
                 //if along the cut axis, shift pos/cut dim
-                //-medCut deprecated
-                // int medIdx = findMedian(j);
-                // dim[j] = pts[medIdx][j] -  boundingArea.getPos()[j];
-                dim[j] = boundingArea.getDims()[j]/2;
+                int medIdx = findMedian(j);
+                dim[j] = pts[medIdx][j] -  boundingArea.getPos()[j];
                 pos[j] = boundingArea.getPos()[j] + dim[j];
             }else{
                 pos[j] = boundingArea.getPos()[j];
                 dim[j] = boundingArea.getDims()[j];
             }
         }
-        //-medCut deprecated
-        // Point otherDim = boundingArea.getDims(), selfDim = dim;
-        // otherDim[i] -= selfDim[i];
-        // BoundBox b = BoundBox(pos, OtherDim);
-
-        BoundBox b = BoundBox(pos, dim);
+        Point otherDim = boundingArea.getDims(), selfDim = dim;
+        otherDim[i] -= selfDim[i];
+        BoundBox b = BoundBox(pos, otherDim);
         otherBucket.setBoundingArea(b);
         boundingArea.setDims(dim);  //start pos doesn't change
 
@@ -240,9 +231,6 @@ bool Bucket::split(Bucket &otherBucket){
                 res = otherBucket.insert(pt);
                 if(!res){
                     cout << "bad insert (splitting)" << endl;
-                    // save.printBoundBox();
-                    // boundingArea.printBoundBox();
-                    // otherBucket.getBoundingArea().printBoundBox();
                     pt.printPoint();
                     while(1){
                         int b = 0;
