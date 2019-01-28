@@ -14,7 +14,7 @@ C++ Program for quantizing colors in images using an implementation of the media
 3. type a file in /data to access (i.e. 'launch.png')   
 4. enter a max bucket size (larger images tend to output a smaller percentage of bins than max)
 5. enter image scaling (>= 1, rec is 1|2)
-5. Quantized picture outputs!
+6. Quantized picture outputs!
 
 ### OPTIONAL COMMANDS
 After generating the picture, OfApp accepts the following commands by keyboard:
@@ -23,7 +23,7 @@ After generating the picture, OfApp accepts the following commands by keyboard:
 - _'c'_: returns the credits and exits the program (Program can also be exited by ctrl+c in the console or esc in the window).
 
 
-If you're interested at looking at the OF code to uses the colorQuantizer to make this program, please contact dimembermatt@gmail.com.
+If you're interested at looking at the OF code for  colorQuantizer to make this program, please contact me.
 
 ### BUGS (OR FEATURES) to be fixed:
 1. Program crashes trying to load an invalid image. (currently no error checking for OF img.load(), although it can be fixed through checking the file path)
